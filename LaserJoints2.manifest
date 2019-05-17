@@ -1,0 +1,14 @@
+{
+  "autodeskProduct": "Fusion360",
+  "type": "addin",
+  "author": "Robin Debreuil",
+  "description": {
+    "": ""
+  },
+  "supportedOS": "windows",
+  "editEnabled": true,
+  "id": "dccc370e-a434-40cc-8053-9bf44943eb50",
+  "version": "",
+  "runOnStartup": false,
+  "sourcewindows": "LaserJoints2.vcxproj"
+}

@@ -1,0 +1,57 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClCompile Include="LaserJoints2.cpp" />
+    <ClCompile Include="TriplerCreatedEventHandler.cpp">
+      <Filter>Sources</Filter>
+    </ClCompile>
+    <ClCompile Include="TriplerDestroyEventHandler.cpp">
+      <Filter>Sources</Filter>
+    </ClCompile>
+    <ClCompile Include="TriplerExecuteEventHandler.cpp">
+      <Filter>Sources</Filter>
+    </ClCompile>
+    <ClCompile Include="TriplerInputChangedEventHandler.cpp">
+      <Filter>Sources</Filter>
+    </ClCompile>
+    <ClCompile Include="TriplerPreviewEventHandler.cpp">
+      <Filter>Sources</Filter>
+    </ClCompile>
+    <ClCompile Include="TriplerValidateEventHandler.cpp">
+      <Filter>Sources</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="TriplerCreatedEventHandler.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="TriplerDestroyEventHandler.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="TriplerExecuteEventHandler.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="TriplerInputChangedEventHandler.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="TriplerPreviewEventHandler.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="TriplerValidateEventHandler.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <Text Include="LaserJoints2.manifest" />
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="Headers">
+      <UniqueIdentifier>{ab6f0739-ea28-4d04-b349-0581d33d4a2a}</UniqueIdentifier>
+      <Extensions>.h</Extensions>
+    </Filter>
+    <Filter Include="Sources">
+      <UniqueIdentifier>{d682dd4f-606b-4ab8-a2af-91ed118ecdaa}</UniqueIdentifier>
+      <Extensions>.cpp</Extensions>
+    </Filter>
+  </ItemGroup>
+</Project>
