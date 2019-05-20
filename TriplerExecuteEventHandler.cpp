@@ -1,7 +1,9 @@
 #include "TriplerExecuteEventHandler.h"
 #include <iostream>
 
-const std::vector<std::string> TriplerExecuteEventHandler::colorNames = std::vector<std::string>({ "Yellow", "Red", "Blue", "White" });
+const std::vector<std::string> TriplerExecuteEventHandler::colorNames = std::vector<std::string>({
+	"Yellow", "Red", "Green", "Blue", "White", "Gray", "Black",
+	"Yellow", "Red", "Green", "Blue", "White", "Gray", "Black"});
 
 TriplerExecuteEventHandler::TriplerExecuteEventHandler()
 {
@@ -46,21 +48,63 @@ void TriplerExecuteEventHandler::notify(const Ptr<CommandEventArgs>& eventArgs)
 	ensureParams();
 
 	Ptr<SelectionCommandInput> rectSel = inputs->itemById("selectionRect");
-	Ptr<Profile> profile0;
-	int extrudeDir0;
+	Ptr<Profile> selProfile;
+	int extrudeDir;
 	if (rectSel)
 	{
-		profile0 = rectSel->selection(0)->entity();
+		selProfile = rectSel->selection(0)->entity();
 
-		Ptr<ButtonRowCommandInput> extendDirectionInput0 = inputs->itemById("extrudeDirection");
-		extrudeDir0 = extendDirectionInput0->selectedItem()->index(); // 0 Pos, 1 Cent, 2 Neg
-		extrudeDir0 = (extrudeDir0 - 1) * -1; // 1 Pos, 0 Cent, -1 Neg
-	}
+		Ptr<ButtonRowCommandInput> extendDirectionInput = inputs->itemById("extrudeDirection");
+		extrudeDir = extendDirectionInput->selectedItem()->index(); // 0 Pos, 1 Cent, 2 Neg
+		extrudeDir = (extrudeDir - 1) * -1; // 1 Pos, 0 Cent, -1 NegectSel)
 
+		std::vector<Ptr<ProfileCurve>> lines = {};
+		int index = 0;
+		for (Ptr<ProfileLoop> pl : selProfile->profileLoops())
+		{
+			if (pl->isOuter() && pl->profileCurves()->count() == 4)
+			{
+				for (Ptr<ProfileCurve> pc : pl->profileCurves())
+				{
+					if (pc->geometryType() == Line3DCurveType) {
+						lines.push_back(pc);
+					}
+				}
+			}
+		}
 
-	if (rectSel)
-	{
-		auto extrudes = tripleProfile(profile0, extrudeDir0);
+		design->activateRootComponent();
+		auto rootComponent = design->activeComponent();
+		//auto ident = Matrix3D::create();
+		//auto baseOccurance = rootComponent->occurrences()->addNewComponent(ident);
+		//baseOccurance->activate();
+		auto extrudeRoot = this->extrudeBody(rootComponent, selProfile, "0", wallHeight, 6);
+		std::vector<Ptr<BRepFace>> sideFaces = {};
+		auto profilePlane = selProfile->plane();
+		Ptr<BRepEdges> edges;
+		Ptr<Line3D> line;
+		for (auto face : extrudeRoot->faces())
+		{
+			edges = face->edges();
+			for (Ptr<BRepEdge> edge : edges)
+			{
+				Ptr<Line3D> line = Line3D::create(edge->startVertex()->geometry(), edge->endVertex()->geometry());
+				if (profilePlane->isPerpendicularToLine(line))
+				{
+					sideFaces.push_back(face);
+					break;
+				}
+			}
+		}
+
+		int cnt = sideFaces.size();
+		int colorIndex = 0;
+		for (auto face : sideFaces)
+		{
+			addAppearance(face, colorIndex);
+			colorIndex++;
+		}
+		//auto extrudes = tripleProfile(selProfile, extrudeDir);
 
 
 	//	auto sketch0 = profile0->parentSketch();
@@ -111,22 +155,22 @@ std::vector<Ptr<ExtrudeFeature>> TriplerExecuteEventHandler::tripleProfile(Ptr<P
 	design->activateRootComponent();
 	auto rootComponent = design->rootComponent();
 	auto ident = Matrix3D::create();
-	auto newComponent = rootComponent->occurrences()->addNewComponent(ident);
-	newComponent->activate();
+	auto newOccurrance = rootComponent->occurrences()->addNewComponent(ident);
+	newOccurrance->activate();
 
 	std::string start = (extrudeDir == 0) ? "-(" + thicknessOuter + " + " + thicknessInner + " / 2)" : "0";
 	std::string dist = (extrudeDir == -1) ? "-" + thicknessOuter : thicknessOuter;
-	auto extrude0 = this->extrudeBody(newComponent, profile, start, dist, 0);
+	auto extrude0 = this->extrudeBody(newOccurrance->component(), profile, start, dist, 0);
 
 	start = (extrudeDir == -1) ? "-" + thicknessOuter :
 		(extrudeDir == 0) ? "-" + thicknessInner + " / 2" : thicknessOuter;
 	dist = (extrudeDir == -1) ? "-" + thicknessInner : thicknessInner;
-	auto extrude1 = this->extrudeBody(newComponent, profile, start, dist, 1);
+	auto extrude1 = this->extrudeBody(newOccurrance->component(), profile, start, dist, 1);
 
 	start = (extrudeDir == -1) ? "-(" + thicknessOuter + " + " + thicknessInner + ")" :
 		(extrudeDir == 0) ? thicknessInner + " / 2" : thicknessOuter + " + " + thicknessInner;
 	dist = (extrudeDir == -1) ? "-" + thicknessOuter : thicknessOuter;
-	auto extrude2 = this->extrudeBody(newComponent, profile, start, dist, 2);
+	auto extrude2 = this->extrudeBody(newOccurrance->component(), profile, start, dist, 2);
 
 	design->activateRootComponent();
 	return std::vector<Ptr<ExtrudeFeature>>{ extrude0, extrude1, extrude2 };
@@ -169,13 +213,13 @@ Ptr<adsk::fusion::UserParameter> TriplerExecuteEventHandler::addOrGetParam(
 }
 
 Ptr<adsk::fusion::ExtrudeFeature> TriplerExecuteEventHandler::extrudeBody(
-	Ptr<adsk::fusion::Occurrence> occurance,
+	Ptr<adsk::fusion::Component> component,
 	Ptr<adsk::fusion::Profile> profile,
 	std::string start,
 	std::string distance,
 	int colorIndex)
 {
-	auto extrudes = occurance->component()->features()->extrudeFeatures();
+	auto extrudes = component->features()->extrudeFeatures();
 	auto extrudeInput = extrudes->createInput(profile, FeatureOperations::NewBodyFeatureOperation);
 
 	auto startExpr = ValueInput::createByString(start);
@@ -216,4 +260,18 @@ Ptr<adsk::core::Appearance> TriplerExecuteEventHandler::addAppearance(
 	return localAppearance;
 }
 
+Ptr<adsk::core::Appearance> TriplerExecuteEventHandler::addAppearance(
+	Ptr<BRepFace> face,
+	int colorIndex)
+{
+	Ptr<MaterialLibrary> lib = app->materialLibraries()->itemByName("Fusion 360 Appearance Library");
+	auto colorName = "Plastic - Matte (" + colorNames[colorIndex] + ")";
+	if (!design->appearances()->itemByName(colorName)) {
+		auto appearance = lib->appearances()->itemByName(colorName);
+		appearance->copyTo(design);
+	}
+	auto localAppearance = design->appearances()->itemByName(colorName);
+	face->appearance(localAppearance);
+	return localAppearance;
+}
 

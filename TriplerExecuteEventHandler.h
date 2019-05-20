@@ -41,7 +41,7 @@ protected:
 		std::string defaultExpression);
 
 	Ptr<adsk::fusion::ExtrudeFeature> extrudeBody(
-		Ptr<adsk::fusion::Occurrence> occurance,
+		Ptr<adsk::fusion::Component> component,
 		Ptr<adsk::fusion::Profile> profile,
 		std::string start,
 		std::string distance,
@@ -53,6 +53,10 @@ protected:
 
 	Ptr<adsk::core::Appearance> addAppearance(
 		Ptr<BRepBody> body,
+		int colorIndex);
+
+	Ptr<adsk::core::Appearance> addAppearance(
+		Ptr<BRepFace> face,
 		int colorIndex);
 };
 
