@@ -72,38 +72,15 @@ void TriplerExecuteEventHandler::notify(const Ptr<CommandEventArgs>& eventArgs)
 				}
 			}
 		}
+		auto wallFaces = getWallFaces(selProfile);
 
-		design->activateRootComponent();
-		auto rootComponent = design->activeComponent();
-		//auto ident = Matrix3D::create();
-		//auto baseOccurance = rootComponent->occurrences()->addNewComponent(ident);
-		//baseOccurance->activate();
-		auto extrudeRoot = this->extrudeBody(rootComponent, selProfile, "0", wallHeight, 6);
-		std::vector<Ptr<BRepFace>> sideFaces = {};
-		auto profilePlane = selProfile->plane();
-		Ptr<BRepEdges> edges;
-		Ptr<Line3D> line;
-		for (auto face : extrudeRoot->faces())
+		for (auto face : wallFaces)
 		{
-			edges = face->edges();
-			for (Ptr<BRepEdge> edge : edges)
-			{
-				Ptr<Line3D> line = Line3D::create(edge->startVertex()->geometry(), edge->endVertex()->geometry());
-				if (profilePlane->isPerpendicularToLine(line))
-				{
-					sideFaces.push_back(face);
-					break;
-				}
-			}
+			auto profile = createProfileOnFace(face);
+			auto extrudes = tripleProfile(profile, extrudeDir);
 		}
 
-		int cnt = sideFaces.size();
-		int colorIndex = 0;
-		for (auto face : sideFaces)
-		{
-			addAppearance(face, colorIndex);
-			colorIndex++;
-		}
+
 		//auto extrudes = tripleProfile(selProfile, extrudeDir);
 
 
@@ -150,27 +127,73 @@ void TriplerExecuteEventHandler::ensureParams()
 	Ptr<adsk::fusion::UserParameter> kerfExpr = addOrGetParam(kerf, "0.1 mm");
 }
 
-std::vector<Ptr<ExtrudeFeature>> TriplerExecuteEventHandler::tripleProfile(Ptr<Profile> profile, int extrudeDir)
+std::vector<Ptr<BRepFace>> TriplerExecuteEventHandler::getWallFaces(Ptr<Profile> profile)
+{
+	design->activateRootComponent();
+	auto rootComponent = design->activeComponent();
+	//auto ident = Matrix3D::create();
+	//auto baseOccurance = rootComponent->occurrences()->addNewComponent(ident);
+	//baseOccurance->activate();
+	auto extrudeRoot = extrudeBody(rootComponent, profile, "0", wallHeight, 6);
+	std::vector<Ptr<BRepFace>> result = {};
+	auto profilePlane = profile->plane();
+	Ptr<BRepEdges> edges;
+	Ptr<Line3D> line;
+	for (auto face : extrudeRoot->faces())
+	{
+		edges = face->edges();
+		for (Ptr<BRepEdge> edge : edges)
+		{
+			Ptr<Line3D> line = Line3D::create(edge->startVertex()->geometry(), edge->endVertex()->geometry());
+			if (profilePlane->isPerpendicularToLine(line))
+			{
+				result.push_back(face);
+				break;
+			}
+		}
+	}
+
+	int cnt = result.size();
+	int colorIndex = 0;
+	for (auto face : result)
+	{
+		addAppearance(face, colorIndex);
+		colorIndex++;
+	}
+	extrudeRoot->bodies()->item(0)->isLightBulbOn(false);
+	return result;
+}
+
+Ptr<Profile> TriplerExecuteEventHandler::createProfileOnFace(Ptr<BRepFace> face)
 {
 	design->activateRootComponent();
 	auto rootComponent = design->rootComponent();
 	auto ident = Matrix3D::create();
 	auto newOccurrance = rootComponent->occurrences()->addNewComponent(ident);
 	newOccurrance->activate();
+	auto sketches = newOccurrance->component()->sketches();
+	auto sketch = sketches->add(face);
+	sketch->project(face->geometry());
+	return sketch->profiles()->item(0);
+}
 
+std::vector<Ptr<ExtrudeFeature>> TriplerExecuteEventHandler::tripleProfile(Ptr<Profile> profile, int extrudeDir)
+{
+	auto sketch = profile->parentSketch();
+	auto component = sketch->parentComponent();
 	std::string start = (extrudeDir == 0) ? "-(" + thicknessOuter + " + " + thicknessInner + " / 2)" : "0";
 	std::string dist = (extrudeDir == -1) ? "-" + thicknessOuter : thicknessOuter;
-	auto extrude0 = this->extrudeBody(newOccurrance->component(), profile, start, dist, 0);
+	auto extrude0 = this->extrudeBody(component, profile, start, dist, 0);
 
 	start = (extrudeDir == -1) ? "-" + thicknessOuter :
 		(extrudeDir == 0) ? "-" + thicknessInner + " / 2" : thicknessOuter;
 	dist = (extrudeDir == -1) ? "-" + thicknessInner : thicknessInner;
-	auto extrude1 = this->extrudeBody(newOccurrance->component(), profile, start, dist, 1);
+	auto extrude1 = this->extrudeBody(component, profile, start, dist, 1);
 
 	start = (extrudeDir == -1) ? "-(" + thicknessOuter + " + " + thicknessInner + ")" :
 		(extrudeDir == 0) ? thicknessInner + " / 2" : thicknessOuter + " + " + thicknessInner;
 	dist = (extrudeDir == -1) ? "-" + thicknessOuter : thicknessOuter;
-	auto extrude2 = this->extrudeBody(newOccurrance->component(), profile, start, dist, 2);
+	auto extrude2 = this->extrudeBody(component, profile, start, dist, 2);
 
 	design->activateRootComponent();
 	return std::vector<Ptr<ExtrudeFeature>>{ extrude0, extrude1, extrude2 };

@@ -34,6 +34,8 @@ protected:
 	bool setLinkages();
 	void ensureParams();
 
+	std::vector<Ptr<BRepFace>> getWallFaces(Ptr<Profile> profile);
+	Ptr<Profile> createProfileOnFace(Ptr<BRepFace> face);
 	std::vector<Ptr<ExtrudeFeature>> tripleProfile(Ptr<Profile> profile, int extrudeDir);
 
 	Ptr<adsk::fusion::UserParameter> addOrGetParam(
