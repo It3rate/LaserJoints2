@@ -9,6 +9,8 @@ using namespace adsk::fusion;
 const std::string wallHeight = "wall_height";
 const std::string thicknessOuter = "thickness_outer";
 const std::string thicknessInner = "thickness_inner";
+const std::string thicknessTotal = "thickness_total";
+const std::string thicknessHalf = "thickness_half";
 const std::string grip = "grip";
 const std::string snap = "snap";
 const std::string kerf = "kerf";
@@ -33,7 +35,7 @@ protected:
 
 	bool setLinkages();
 	void ensureParams();
-
+	void makeMidNotch(Ptr<SketchLine> line);
 	std::vector<Ptr<BRepFace>> getWallFaces(Ptr<Profile> profile);
 	Ptr<Profile> createProfileOnFace(Ptr<BRepFace> face);
 	std::vector<Ptr<ExtrudeFeature>> tripleProfile(Ptr<Profile> profile, int extrudeDir);

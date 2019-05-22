@@ -77,6 +77,7 @@ void TriplerExecuteEventHandler::notify(const Ptr<CommandEventArgs>& eventArgs)
 		for (auto face : wallFaces)
 		{
 			auto profile = createProfileOnFace(face);
+			// pass plane centriod for notches
 			auto extrudes = tripleProfile(profile, extrudeDir);
 		}
 
@@ -122,6 +123,10 @@ void TriplerExecuteEventHandler::ensureParams()
 	Ptr<adsk::fusion::UserParameter> wallHeightExpr = addOrGetParam(wallHeight, "20 mm");
 	Ptr<adsk::fusion::UserParameter> outerExpr = addOrGetParam(thicknessOuter, "2 mm");
 	Ptr<adsk::fusion::UserParameter> innerExpr = addOrGetParam(thicknessInner, "3 mm");
+	Ptr<adsk::fusion::UserParameter> thicknessTotalExpr = addOrGetParam(thicknessTotal,
+		thicknessOuter + "* 2 + " + thicknessInner);
+	Ptr<adsk::fusion::UserParameter> thicknessHalfExpr = addOrGetParam(thicknessHalf,
+		thicknessInner + "/ 2 + " + thicknessOuter);
 	Ptr<adsk::fusion::UserParameter> gripExpr = addOrGetParam(grip, "2 mm");
 	Ptr<adsk::fusion::UserParameter> snapExpr = addOrGetParam(snap, "0.5 mm");
 	Ptr<adsk::fusion::UserParameter> kerfExpr = addOrGetParam(kerf, "0.1 mm");
@@ -177,11 +182,63 @@ Ptr<Profile> TriplerExecuteEventHandler::createProfileOnFace(Ptr<BRepFace> face)
 	return sketch->profiles()->item(0);
 }
 
+void TriplerExecuteEventHandler::makeMidNotch(Ptr<SketchLine> line)
+{
+	auto lines = line->parentSketch()->sketchCurves()->sketchLines();
+	auto x0 = line->startSketchPoint()->geometry()->x();
+	auto y0 = line->startSketchPoint()->geometry()->y();
+	auto x1 = line->endSketchPoint()->geometry()->x();
+	auto y1 = line->endSketchPoint()->geometry()->y();
+	double xDir = (x0 < x1) ? 1 : (x0 > x1) ? -1 : 0;
+	double yDir = (y0 < y1) ? 1 : (y0 > y1) ? -1 : 0;
+	double step = 0.4;
+	double stepX = step * xDir;
+	double stepY = step * yDir;
+	double midx0 = (x1 - x0) / 2.0 + x0 - step * xDir;
+	double midx1 = (x1 - x0) / 2.0 + x0 + step * xDir;
+	double midy0 = (y1 - y0) / 2.0 + y0 - step * yDir;
+	double midy1 = (y1 - y0) / 2.0 + y0 + step * yDir;
+	line->isConstruction(true);
+	lines->addByTwoPoints(Point3D::create(x0, y0, 0), Point3D::create(midx0, midy0, 0));
+	lines->addByTwoPoints(Point3D::create(midx0, midy0, 0), Point3D::create(midx0 + stepY, midy0 - stepX, 0));
+	lines->addByTwoPoints(Point3D::create(midx0 + stepY, midy0 - stepX, 0), Point3D::create(midx1 + stepY, midy1 - stepX, 0));
+	lines->addByTwoPoints(Point3D::create(midx1 + stepY, midy1 - stepX, 0), Point3D::create(midx1, midy1, 0));
+	lines->addByTwoPoints(Point3D::create(midx1, midy1, 0), Point3D::create(x1, y1, 0));
+}
 std::vector<Ptr<ExtrudeFeature>> TriplerExecuteEventHandler::tripleProfile(Ptr<Profile> profile, int extrudeDir)
 {
 	auto sketch = profile->parentSketch();
+
+	auto lines = sketch->sketchCurves()->sketchLines();
+	makeMidNotch(lines->item(0));
+	makeMidNotch(lines->item(1));
+	makeMidNotch(lines->item(2));
+	makeMidNotch(lines->item(3));
+	//sketchLines->addTwoPointRectangle(
+	//	Point3D::create(min->x(), min->y(), 0),
+	//	Point3D::create(min->x() - 0.5, min->y() + 0.5, 0));
+
+	auto max = profile->boundingBox()->maxPoint();
+	auto min = profile->boundingBox()->minPoint();
+	auto cx = (max->x() - min->x()) / 2.0 + min->x();
+	auto cy = (max->y() - min->y()) / 2.0 + min->y();
+	auto cz = (max->z() - min->z()) / 2.0 + min->z();
+	auto cent = Point3D::create(cx, cy, cz);
+	sketch->sketchCurves()->sketchCircles()->addByCenterRadius(cent, 0.5);
+
+	auto profileCount = sketch->profiles()->count();
+	double maxArea = 0;
+	for (auto p : sketch->profiles())
+	{
+		if (p->areaProperties()->area() > maxArea)
+		{
+			profile = p;
+			maxArea = p->areaProperties()->area();
+		}
+	}
+
 	auto component = sketch->parentComponent();
-	std::string start = (extrudeDir == 0) ? "-(" + thicknessOuter + " + " + thicknessInner + " / 2)" : "0";
+	std::string start = (extrudeDir == 0) ? "-" + thicknessHalf : "0";
 	std::string dist = (extrudeDir == -1) ? "-" + thicknessOuter : thicknessOuter;
 	auto extrude0 = this->extrudeBody(component, profile, start, dist, 0);
 
@@ -190,7 +247,7 @@ std::vector<Ptr<ExtrudeFeature>> TriplerExecuteEventHandler::tripleProfile(Ptr<P
 	dist = (extrudeDir == -1) ? "-" + thicknessInner : thicknessInner;
 	auto extrude1 = this->extrudeBody(component, profile, start, dist, 1);
 
-	start = (extrudeDir == -1) ? "-(" + thicknessOuter + " + " + thicknessInner + ")" :
+	start = (extrudeDir == -1) ? "-" + thicknessHalf :
 		(extrudeDir == 0) ? thicknessInner + " / 2" : thicknessOuter + " + " + thicknessInner;
 	dist = (extrudeDir == -1) ? "-" + thicknessOuter : thicknessOuter;
 	auto extrude2 = this->extrudeBody(component, profile, start, dist, 2);
